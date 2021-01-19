@@ -119,7 +119,6 @@ def status_writer(cmd_queue: Queue,
                 flush()
                 is_running = True
 
-
             elif cmd == MSG:
                 msg = args[0]
                 new_msg = msg_tmp.format(h=h, m=m, s=s, msg=msg)
@@ -151,4 +150,3 @@ def status_writer(cmd_queue: Queue,
             new_msg = msg_tmp.format(h=h, m=m, s=s, msg=msg)
             update_status(msgs, new_msg, maxlines)
             flush()
-
