@@ -25,9 +25,9 @@ doctest_modules = [
 ]
 ignore = []
 python_files = [
-    '*'
-    # Put the core module directory here.
-    # Submodules need separate entries because glob doesn't recurse.
+    '*',
+    'examples/*',
+    'statuswriter/*',
     'tests/*',
 ]
 rst_files = [
