@@ -11,21 +11,30 @@ from textwrap import wrap
 import time
 
 
-# Static values.
+# Terminal control codes used to move the location of the cursor.
 LN_UP = '\033[A'
 LN_DOWN = '\n'
-write, flush = sys.stdout.write, sys.stdout.flush
 
-# Status message commands.
+# The command codes used by status_writer.
 INIT = 0x0
 MSG = 0x1
 PROG = 0x2
 KILL = 0xe
 END = 0xf
 
+# Shortcuts for functions that write to the terminal.
+write, flush = sys.stdout.write, sys.stdout.flush
+
 
 # Utility functions.
 def make_progress_frame(total: int) -> tuple[str, str, str]:
+    """Create the strings for the initial state of the progress bar.
+
+    :param total: The total number of steps needed to complete the
+        monitored application.
+    :return: A :class:tuple object.
+    :rtype: tuple
+    """
     lines = (
         ('\u250c', ' ', '\u2510',),
         ('\u2502', '\u2591', '\u2502',),
@@ -60,7 +69,18 @@ def timer():
 
 
 def update_progress(total: int, complete: int, lines:int = 0) -> None:
-    """Update the progress bar."""
+    """Update the progress bar.
+
+    :param total: The total number of steps before the monitored
+        application is complete.
+    :param complete: The number of steps that have been completed.
+    :param lines: (Optional.) How far below the bottom of the progress
+        bar frame the cursor is located when this function is called.
+        This allows the cursor to start and end in a known position if
+        status messages are displayed below the progress bar.
+    :return: None.
+    :rtype: NoneType
+    """
     incomplete = total - complete
     bar = '\u2588' * complete + '\u2591' * incomplete
     frame_with_bar = f'\u2502{bar}\u2502'
@@ -77,9 +97,23 @@ def update_status(msgs: deque,
                   maxlines: int = 4,
                   term_width: int = 72,
                   hang_indent: int = 0) -> None:
+    """Update the status messages.
+
+    :param msgs: The messages currently displayed in the terminal.
+    :param new_msg: The new message to display.
+    :param maxlines: (Optional.) The number of lines to display in the
+        terminal. This isn't exactly the number of messages because
+        long messages can wrap into multiple lines.
+    :param term_width: (Optional.) The number of fixed-width characters
+        that can fit in a single line in the terminal. Messages longer
+        than this are wrapped into multiple lines.
+    :param hang_indent: (Optional.) The number of spaces to indent
+        wrapped lines.
+    :return: None.
+    :rtype: NoneType
+    """
     # Clear old messages. Deques don't support standard slicing, so
     # having to loop through the indices rather than the deque.
-    """Update the status messages."""
     for i in range(len(msgs))[::-1]:
         write(f'\r{LN_UP}' + ' ' * len(msgs[i]))
 
@@ -123,7 +157,7 @@ def status_writer(cmd_queue: Queue,
         for a new message. If zero is given, status_writer will check
         continuously and not update the last status.
     :return: None.
-    :rtype: None.
+    :rtype: NoneType
 
     Commands
     ========
@@ -149,14 +183,18 @@ def status_writer(cmd_queue: Queue,
     msg_tmp = '{h:02d}:{m:02d}:{s:02d} {msg}'
     stages_complete = 0
     msg = 'Starting...'
+
+    # Flags that allow the writer to monitor its state.
     is_running = False
     was_waiting = False
 
+    # The application loop.
     while True:
         h, m, s = split_time(next(timer_))
         if not cmd_queue.empty():
             cmd, *args = cmd_queue.get()
 
+            # Initialize the status display in the terminal.
             if cmd == INIT:
                 prog_bar = make_progress_frame(stages)
                 write(f'{title}\n')
@@ -170,6 +208,7 @@ def status_writer(cmd_queue: Queue,
                 flush()
                 is_running = True
 
+            # Write a status message to the status display.
             elif cmd == MSG:
                 # If the writer has been waiting for an update, remove
                 # the waiting message so it doesn't stay in the
@@ -180,6 +219,8 @@ def status_writer(cmd_queue: Queue,
                     msgs.pop()
                     msgs.appendleft(old_msg)
                     was_waiting = False
+
+                # Display the message.
                 msg = args[0]
                 new_msg = msg_tmp.format(h=h, m=m, s=s, msg=msg)
                 t_width = 72
@@ -187,20 +228,31 @@ def status_writer(cmd_queue: Queue,
                 update_status(msgs, new_msg, maxlines, t_width, h_indent)
                 flush()
 
+            # Advance the progress bar.
             elif cmd == PROG:
                 stages_complete += 1
                 update_progress(stages, stages_complete, maxlines)
                 flush()
 
+            # Abort the status display when an exception is caught in
+            # the monitored application, and display the trace of that
+            # exception. This is needed because status_writer runs in
+            # a separate thread from the application, so it will
+            # overwrite the trace printed by the monitored application.
+            # It only works if the monitored application catches the
+            # exception and sends it to status_writer the the KILL
+            # command code.
             elif cmd == KILL:
                 new_msg = msg_tmp.format(h=h, m=m, s=s, msg='Aborting...')
                 update_status(msgs, new_msg, maxlines)
                 flush()
                 raise args[0]
 
+            # Terminate the status_writer.
             elif cmd == END:
                 break
 
+            # Raise an exception if an unknown command is received.
             else:
                 msg = f'Command {cmd} not recognized.'
                 raise ValueError(msg)
