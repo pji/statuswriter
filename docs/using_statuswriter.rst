@@ -119,7 +119,7 @@ like::
 
 The `long_running_process()` in the example is whatever long
 running function you want. The result of that code will look
-something like this:
+something like this::
 
     SPAM
     ┌      ┐
