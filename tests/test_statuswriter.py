@@ -278,6 +278,93 @@ class UpdateStatusTestCase(ut.TestCase):
         self.assertEqual(exp_msgs, act_msgs)
 
     @patch('statuswriter.statuswriter.write')
+    def test_update_with_long_message_wrap(self, mock_write):
+        """Given a deque of status messages and a new message that is
+        longer than the given terminal width, write those messages to
+        the terminal, wrapping the long message over several lines.
+        """
+        # Expected value.
+        exp = [
+            call('\r\033[A' + '     '),
+            call('\r\033[A' + '    '),
+            call('\r' + 'bacon' + '\n'),
+            call('\r' + '01234567890123456789' + '\n'),
+            call('\r' + '0123456789' + '\n'),
+        ]
+        exp_msgs = deque([
+            'bacon',
+            '01234567890123456789',
+            '0123456789',
+        ])
+
+        # Set up test data and state.
+        act_msgs = deque([
+            'eggs',
+            'bacon',
+        ])
+        kwargs = {
+            'msgs': act_msgs,
+            'new_msg': '012345678901234567890123456789',
+            'maxlines': 3,
+            'term_width': 20,
+        }
+
+        # Run test.
+        sw.update_status(**kwargs)
+
+        # Extract test result.
+        act = mock_write.mock_calls
+
+        # Determine if test passed.
+        self.assertListEqual(exp, act)
+        self.assertEqual(exp_msgs, act_msgs)
+
+    @patch('statuswriter.statuswriter.write')
+    def test_update_with_hanging_indent_on_wrap(self, mock_write):
+        """Given a deque of status messages, a new message that is
+        longer than the given terminal width, and the size of the
+        hanging indent for wrapped lines, write those messages to
+        the terminal, wrapping the long message over several lines,
+        indenting each wrapped line by the amount given.
+        """
+        # Expected value.
+        exp = [
+            call('\r\033[A' + '     '),
+            call('\r\033[A' + '    '),
+            call('\r' + 'bacon' + '\n'),
+            call('\r' + '01234567890123456789' + '\n'),
+            call('\r' + '    0123456789' + '\n'),
+        ]
+        exp_msgs = deque([
+            'bacon',
+            '01234567890123456789',
+            '    0123456789',
+        ])
+
+        # Set up test data and state.
+        act_msgs = deque([
+            'eggs',
+            'bacon',
+        ])
+        kwargs = {
+            'msgs': act_msgs,
+            'new_msg': '012345678901234567890123456789',
+            'maxlines': 3,
+            'term_width': 20,
+            'hang_indent': 4,
+        }
+
+        # Run test.
+        sw.update_status(**kwargs)
+
+        # Extract test result.
+        act = mock_write.mock_calls
+
+        # Determine if test passed.
+        self.assertListEqual(exp, act)
+        self.assertEqual(exp_msgs, act_msgs)
+
+    @patch('statuswriter.statuswriter.write')
     def test_update_with_old_messages(self, mock_write):
         """Given a deque of status messages and a new message not yet
         in the queue, write those messages to the terminal.

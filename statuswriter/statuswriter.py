@@ -7,6 +7,7 @@ A module for writing basic status updates to a command line interface.
 from collections import deque
 from queue import Queue
 import sys
+from textwrap import wrap
 import time
 
 
@@ -52,12 +53,14 @@ def split_time(duration: float) -> tuple[int, int, int]:
 
 
 def timer():
+    """A simple generator for timing a process."""
     t0 = time.time()
     while True:
         yield time.time() - t0
 
 
 def update_progress(total: int, complete: int, lines:int = 0) -> None:
+    """Update the progress bar."""
     incomplete = total - complete
     bar = '\u2588' * complete + '\u2591' * incomplete
     frame_with_bar = f'\u2502{bar}\u2502'
@@ -69,15 +72,23 @@ def update_progress(total: int, complete: int, lines:int = 0) -> None:
         write(LN_DOWN * (lines + 2) + '\r')
 
 
-def update_status(msgs: deque, new_msg: str, maxlines: int = 4) -> None:
+def update_status(msgs: deque,
+                  new_msg: str,
+                  maxlines: int = 4,
+                  term_width: int = 72,
+                  hang_indent: int = 0) -> None:
     # Clear old messages. Deques don't support standard slicing, so
     # having to loop through the indices rather than the deque.
+    """Update the status messages."""
     for i in range(len(msgs))[::-1]:
         write(f'\r{LN_UP}' + ' ' * len(msgs[i]))
 
     # Add the new message to the message queue and roll off old
     # messages.
-    msgs.append(new_msg)
+    indent = ' ' * hang_indent
+    new_lines = wrap(new_msg, term_width, subsequent_indent=indent)
+    for line in new_lines:
+        msgs.append(line)
     while len(msgs) > maxlines:
         msgs.popleft()
 
@@ -139,6 +150,7 @@ def status_writer(cmd_queue: Queue,
     stages_complete = 0
     msg = 'Starting...'
     is_running = False
+    was_waiting = False
 
     while True:
         h, m, s = split_time(next(timer_))
@@ -159,9 +171,20 @@ def status_writer(cmd_queue: Queue,
                 is_running = True
 
             elif cmd == MSG:
+                # If the writer has been waiting for an update, remove
+                # the waiting message so it doesn't stay in the
+                # display, and add the old top message back into the
+                # deque to prevent problems when update_status() rolls
+                # the messages.
+                if was_waiting:
+                    msgs.pop()
+                    msgs.appendleft(old_msg)
+                    was_waiting = False
                 msg = args[0]
                 new_msg = msg_tmp.format(h=h, m=m, s=s, msg=msg)
-                update_status(msgs, new_msg, maxlines)
+                t_width = 72
+                h_indent = 9
+                update_status(msgs, new_msg, maxlines, t_width, h_indent)
                 flush()
 
             elif cmd == PROG:
@@ -182,10 +205,29 @@ def status_writer(cmd_queue: Queue,
                 msg = f'Command {cmd} not recognized.'
                 raise ValueError(msg)
 
+        # Update the status messages periodically to let the user
+        # know how long as elapsed since the monitored application
+        # began.
         elif refresh and is_running:
             time.sleep(refresh)
-            msgs.pop()
-            msgs.appendleft('')
-            new_msg = msg_tmp.format(h=h, m=m, s=s, msg=msg)
+
+            # If the writer has been waiting for an update, there is
+            # already a waiting line in the message deque. Remove it
+            # and add back the old top message to make sure the
+            # messages roll well.
+            if was_waiting:
+                msgs.pop()
+                msgs.appendleft(old_msg)
+
+            # If we are adding a waiting message to the deque, we need
+            # to store the top message in the deque that will roll off
+            # due to the waiting message. Otherwise, update_status()
+            # won't roll the messages properly.
+            else:
+                old_msg = msgs[0]
+
+            # Display the waiting message.
+            new_msg = msg_tmp.format(h=h, m=m, s=s, msg='Waiting...')
             update_status(msgs, new_msg, maxlines)
             flush()
+            was_waiting = True
