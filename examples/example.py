@@ -28,7 +28,7 @@ status.put((sw.INIT,))
 # the queue.
 for i in range(progress_stages):
     sleep(2)
-#     status.put((sw.PROG,))
+    status.put((sw.PROG,))
     status.put((sw.MSG, f'Stage {i} complete.'))
 status.put((sw.MSG, 'Example complete.'))
 status.put((sw.END,))

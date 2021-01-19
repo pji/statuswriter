@@ -92,6 +92,45 @@ def status_writer(cmd_queue: Queue,
                   stages: int,
                   maxlines: int = 4,
                   refresh: int = 0) -> None:
+    """A coroutine to display status messages and progress to the
+    command line.
+
+    :param cmd_queue: A queue used to pass commands to the coroutine.
+        Commands are passed as a tuple that contains a command code
+        and command arguments. See the table below for the list of
+        command codes and arguments.
+    :param stages: The number of steps the program will complete before
+        it is done. This is used to determine the size of the progress
+        bar.
+    :param maxlines: (Optional.) The number of messages that will be
+        displayed by status_writer. If the maximum number of lines is
+        reached, the oldest messages will roll off.
+    :param refresh: (Optional.) How frequently status_writer should
+        check the command queue for new commands in seconds. If a
+        number other than zero is given, the status_writer will update
+        the time on the last displayed message to indicate it's waiting
+        for a new message. If zero is given, status_writer will check
+        continuously and not update the last status.
+    :return: None.
+    :rtype: None.
+
+    Commands
+    ========
+    The following table gives the available command codes and what
+    arguments are needed for that command code.
+
+    ------- ----------- ------------------------------------------------
+    Code    Arguments   Description
+    ------- ----------- ------------------------------------------------
+    INIT    N/A         Write the initial display.
+    MSG     message     Update the display with the given message.
+    PROG    N/A         Advance the progress bar.
+    KILL    exception   Abort the write and raise the given exception.
+    END     N/A         Terminate the writer.
+    ------- ----------- ------------------------------------------------
+
+    For usage examples, see the example scripts.
+    """
     msgs = deque()
     for _ in range(maxlines - 1):
         msgs.append('')
