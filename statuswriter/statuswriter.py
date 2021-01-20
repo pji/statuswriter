@@ -184,7 +184,7 @@ def status_writer(cmd_queue: Queue,
     if stages:
         stages_complete = 0
         prog_bar = make_progress_frame(stages)
-    
+
     # Basic configuration for messages.
     if maxlines:
         msgs = deque()
@@ -219,7 +219,7 @@ def status_writer(cmd_queue: Queue,
                     msgs.append(new_msg)
                     for line in msgs:
                         write(f'{line}\n')
-                
+
                 # Finish the initialization.
                 flush()
                 is_running = True
@@ -231,7 +231,7 @@ def status_writer(cmd_queue: Queue,
                 if not maxlines:
                     msg = 'Not configured to allow messages.'
                     raise ValueError(msg)
-                
+
                 # If the writer has been waiting for an update, remove
                 # the waiting message so it doesn't stay in the
                 # display, and add the old top message back into the

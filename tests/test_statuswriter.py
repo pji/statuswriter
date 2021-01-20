@@ -120,7 +120,7 @@ class StatusWriter(ut.TestCase):
         # Expected value.
         exp_write = [
             self.init_write_calls[0],
-            *self.init_write_calls[4:],            
+            *self.init_write_calls[4:],
         ]
         exp_flush = self.init_flush_calls
 
@@ -258,6 +258,31 @@ class StatusWriter(ut.TestCase):
 
     @patch('statuswriter.statuswriter.write')
     @patch('statuswriter.statuswriter.flush')
+    def test_message_without_messages(self, _, __):
+        """If an MSG command is sent without a message display area
+        being configured, status_writer should raise a ValueError.
+        """
+        # Expected value.
+        exp_exception = ValueError
+        exp_msg = 'Not configured to allow messages.'
+
+        # Set up test data and status.
+        cmd_queue = Queue()
+        cmd_queue.put((sw.INIT,))
+        cmd_queue.put((sw.MSG, 'bacon'))
+        cmd_queue.put((sw.END,))
+        title = self.title
+        stages = 6
+        maxlines = 0
+
+        # Will determine if test passed.
+        with self.assertRaisesRegex(exp_exception, exp_msg):
+
+            # Run test.
+            _ = sw.status_writer(cmd_queue, title, stages, maxlines)
+
+    @patch('statuswriter.statuswriter.write')
+    @patch('statuswriter.statuswriter.flush')
     @patch('time.time', return_value=1000)
     def test_progress(self, _, mock_flush, mock_write):
         """When a progress command is sent to the message queue, the
@@ -294,6 +319,31 @@ class StatusWriter(ut.TestCase):
         # Determine if test passed.
         self.assertListEqual(exp_write, act_write)
         self.assertListEqual(exp_flush, act_flush)
+
+    @patch('statuswriter.statuswriter.write')
+    @patch('statuswriter.statuswriter.flush')
+    def test_progress_without_bar(self, _, __):
+        """If an PROG command is sent without a progress bar
+        being configured, status_writer should raise a ValueError.
+        """
+        # Expected value.
+        exp_exception = ValueError
+        exp_msg = 'Not configured to show a progress bar.'
+
+        # Set up test data and status.
+        cmd_queue = Queue()
+        cmd_queue.put((sw.INIT,))
+        cmd_queue.put((sw.PROG,))
+        cmd_queue.put((sw.END,))
+        title = self.title
+        stages = 0
+        maxlines = 2
+
+        # Will determine if test passed.
+        with self.assertRaisesRegex(exp_exception, exp_msg):
+
+            # Run test.
+            _ = sw.status_writer(cmd_queue, title, stages, maxlines)
 
 
 class TimerTestCase(ut.TestCase):
