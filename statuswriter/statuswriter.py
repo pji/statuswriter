@@ -134,7 +134,7 @@ def update_status(msgs: deque,
 # Public function.
 def status_writer(cmd_queue: Queue,
                   title: str,
-                  stages: int,
+                  stages: int = 0,
                   maxlines: int = 4,
                   refresh: int = 0) -> None:
     """A coroutine to display status messages and progress to the
@@ -144,12 +144,14 @@ def status_writer(cmd_queue: Queue,
         Commands are passed as a tuple that contains a command code
         and command arguments. See the table below for the list of
         command codes and arguments.
-    :param stages: The number of steps the program will complete before
-        it is done. This is used to determine the size of the progress
-        bar.
+    :param stages: (Optional.) The number of steps the program will
+        complete before it is done. This is used to determine the size
+        of the progress bar. If this is zero, the progress bar will
+        not be displayed.
     :param maxlines: (Optional.) The number of messages that will be
         displayed by status_writer. If the maximum number of lines is
-        reached, the oldest messages will roll off.
+        reached, the oldest messages will roll off. If this is set to
+        zero, there will be no message display area.
     :param refresh: (Optional.) How frequently status_writer should
         check the command queue for new commands in seconds. If a
         number other than zero is given, the status_writer will update
@@ -176,13 +178,20 @@ def status_writer(cmd_queue: Queue,
 
     For usage examples, see the example scripts.
     """
-    msgs = deque()
-    for _ in range(maxlines - 1):
-        msgs.append('')
     timer_ = timer()
-    msg_tmp = '{h:02d}:{m:02d}:{s:02d} {msg}'
-    stages_complete = 0
-    msg = 'Starting...'
+
+    # Basic configuration for the progress bar.
+    if stages:
+        stages_complete = 0
+        prog_bar = make_progress_frame(stages)
+    
+    # Basic configuration for messages.
+    if maxlines:
+        msgs = deque()
+        for _ in range(maxlines - 1):
+            msgs.append('')
+        msg_tmp = '{h:02d}:{m:02d}:{s:02d} {msg}'
+        msg = 'Starting...'
 
     # Flags that allow the writer to monitor its state.
     is_running = False
@@ -196,20 +205,33 @@ def status_writer(cmd_queue: Queue,
 
             # Initialize the status display in the terminal.
             if cmd == INIT:
-                prog_bar = make_progress_frame(stages)
+                # Write the title.
                 write(f'{title}\n')
-                for line in prog_bar:
-                    write(f'{line}\n')
 
-                new_msg = msg_tmp.format(h=h, m=m, s=s, msg=msg)
-                msgs.append(new_msg)
-                for line in msgs:
-                    write(f'{line}\n')
+                # Set up the progress bar.
+                if stages:
+                    for line in prog_bar:
+                        write(f'{line}\n')
+
+                # Set up the messages.
+                if maxlines:
+                    new_msg = msg_tmp.format(h=h, m=m, s=s, msg=msg)
+                    msgs.append(new_msg)
+                    for line in msgs:
+                        write(f'{line}\n')
+                
+                # Finish the initialization.
                 flush()
                 is_running = True
 
             # Write a status message to the status display.
             elif cmd == MSG:
+                # If the writer was not configured to write messages,
+                # there is no place to put them.
+                if not maxlines:
+                    msg = 'Not configured to allow messages.'
+                    raise ValueError(msg)
+                
                 # If the writer has been waiting for an update, remove
                 # the waiting message so it doesn't stay in the
                 # display, and add the old top message back into the
@@ -230,6 +252,9 @@ def status_writer(cmd_queue: Queue,
 
             # Advance the progress bar.
             elif cmd == PROG:
+                if not stages:
+                    msg = 'Not configured to show a progress bar.'
+                    raise ValueError(msg)
                 stages_complete += 1
                 update_progress(stages, stages_complete, maxlines)
                 flush()
@@ -260,7 +285,7 @@ def status_writer(cmd_queue: Queue,
         # Update the status messages periodically to let the user
         # know how long as elapsed since the monitored application
         # began.
-        elif refresh and is_running:
+        elif refresh and is_running and maxlines:
             time.sleep(refresh)
 
             # If the writer has been waiting for an update, there is

@@ -110,6 +110,71 @@ class StatusWriter(ut.TestCase):
 
     @patch('statuswriter.statuswriter.write')
     @patch('statuswriter.statuswriter.flush')
+    @patch('time.time', return_value=1000)
+    def test_initialize_without_progress(self, _, mock_flush, mock_write):
+        """Given a deque for messages, a title and a maximum number of
+        messages to display, but no progress stages, status_writer
+        should write the initial status display to the terminal without
+        a progress bar.
+        """
+        # Expected value.
+        exp_write = [
+            self.init_write_calls[0],
+            *self.init_write_calls[4:],            
+        ]
+        exp_flush = self.init_flush_calls
+
+        # Set up test data and status.
+        cmd_queue = Queue()
+        cmd_queue.put((sw.INIT,))
+        cmd_queue.put((sw.END,))
+        title = self.title
+        maxlines = 2
+
+        # Run test.
+        _ = sw.status_writer(cmd_queue, title, maxlines=maxlines)
+
+        # Extract actual results.
+        act_write = mock_write.mock_calls
+        act_flush = mock_flush.mock_calls
+
+        # Determine if test passed.
+        self.assertListEqual(exp_write, act_write)
+        self.assertListEqual(exp_flush, act_flush)
+
+    @patch('statuswriter.statuswriter.write')
+    @patch('statuswriter.statuswriter.flush')
+    @patch('time.time', return_value=1000)
+    def test_initialize_without_messages(self, _, mock_flush, mock_write):
+        """Given a deque for messages, a title and a number of progres
+        stages, but no progress stages, status_writer should write the
+        initial status display to the terminal without a progress bar.
+        """
+        # Expected value.
+        exp_write = self.init_write_calls[:4]
+        exp_flush = self.init_flush_calls
+
+        # Set up test data and status.
+        cmd_queue = Queue()
+        cmd_queue.put((sw.INIT,))
+        cmd_queue.put((sw.END,))
+        title = self.title
+        stages = 6
+        maxlines = 0
+
+        # Run test.
+        _ = sw.status_writer(cmd_queue, title, stages, maxlines)
+
+        # Extract actual results.
+        act_write = mock_write.mock_calls
+        act_flush = mock_flush.mock_calls
+
+        # Determine if test passed.
+        self.assertListEqual(exp_write, act_write)
+        self.assertListEqual(exp_flush, act_flush)
+
+    @patch('statuswriter.statuswriter.write')
+    @patch('statuswriter.statuswriter.flush')
     @patch('time.time', side_effect=[1000, 1000, 4661, 4661])
     def test_kill(self, _, mock_flush, mock_write):
         """When a message command is sent to the message queue, the
