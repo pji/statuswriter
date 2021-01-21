@@ -15,7 +15,7 @@ import statuswriter as sw
 status = Queue()
 title = 'EXAMPLE: a statuswriter example.'
 progress_stages = 6
-maxlines = 4
+maxlines = 6
 refresh = 1
 args = (status, title, progress_stages, maxlines, refresh)
 
@@ -27,6 +27,7 @@ status.put((sw.INIT,))
 # Run your application, sending commands to status_writer through
 # the queue.
 for i in range(progress_stages):
+    status.put((sw.MSG, f'Stage {i} starting...'))
     sleep(2)
     status.put((sw.PROG,))
     status.put((sw.MSG, f'Stage {i} complete.'))

@@ -68,7 +68,7 @@ def split_time(duration: float) -> tuple[int, int, int]:
     return h, m, s
 
 
-def timer():
+def timer() -> float:
     """A simple generator for timing a process."""
     t0 = time.time()
     while True:
@@ -121,7 +121,11 @@ def update_status(msgs: deque,
     # Clear old messages. Deques don't support standard slicing, so
     # having to loop through the indices rather than the deque.
     for i in range(len(msgs))[::-1]:
-        write(f'\r{LN_UP}' + ' ' * len(msgs[i]))
+        try:
+            write(f'\r{LN_UP}' + ' ' * len(msgs[i]))
+        except TypeError as e:
+            print(msgs)
+            raise e
 
     # Add the new message to the message queue and roll off old
     # messages.
@@ -137,7 +141,7 @@ def update_status(msgs: deque,
         write(f'\r{msg}\n')
 
 
-# status_writer command functions.
+# Command functions.
 def _init(msgs: deque,
           title: str,
           stages: int,
@@ -210,7 +214,6 @@ def _prog(stages: int, stages_complete: int, maxlines: int) -> None:
     if not stages:
         msg = 'Not configured to show a progress bar.'
         raise ValueError(msg)
-    stages_complete += 1
     update_progress(stages, stages_complete, maxlines)
     flush()
 
@@ -267,15 +270,18 @@ def status_writer(cmd_queue: Queue,
     # Basic configuration for the progress bar.
     stages_complete = 0
 
-    # Basic configuration for messages.
+    # Basic configuration for messages. We are priming msgs with lines
+    # that contain a space so that later we can tell the difference
+    # between these primed lines and a false value in was_waiting when
+    # trying to determine whether the bottom message in the status
+    # display is a waiting message.
     msgs = deque()
     for _ in range(maxlines - 1):
-        msgs.append('')
-    msg_tmp = '{h:02d}:{m:02d}:{s:02d} {msg}'
+        msgs.append(' ')
 
     # Flags that allow the writer to monitor its state.
     is_running = False
-    was_waiting = False
+    was_waiting = ''
 
     # The application loop.
     while True:
@@ -294,6 +300,7 @@ def status_writer(cmd_queue: Queue,
 
             # Advance the progress bar.
             elif cmd == PROG:
+                stages_complete += 1
                 _prog(stages, stages_complete, maxlines)
 
             # Abort the status display when an exception is caught in
@@ -320,7 +327,6 @@ def status_writer(cmd_queue: Queue,
         # know how long as elapsed since the monitored application
         # began.
         elif refresh and is_running and maxlines:
-            h, m, s = split_time(next(timer_))
             time.sleep(refresh)
 
             # If the writer has been waiting for an update, there is
@@ -339,6 +345,8 @@ def status_writer(cmd_queue: Queue,
                 was_waiting = msgs[0]
 
             # Display the waiting message.
-            new_msg = msg_tmp.format(h=h, m=m, s=s, msg='Waiting...')
+            h, m, s = split_time(next(timer_))
+            prefix = PREFIX_TEMPLATE.format(h=h, m=m, s=s)
+            new_msg = MSG_TEMPLATE.format(prefix=prefix, msg='Waiting...')
             update_status(msgs, new_msg, maxlines)
             flush()

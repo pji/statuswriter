@@ -70,7 +70,7 @@ class StatusWriter(ut.TestCase):
             call(self.progress_frame[0] + '\n'),
             call(self.progress_frame[1] + '\n'),
             call(self.progress_frame[2] + '\n'),
-            call('\n'),
+            call(' \n'),
             call(self.msg_tmp.format(0, 0, 0, 'Starting...') + '\n'),
         ]
         self.init_flush_calls = [
@@ -184,7 +184,7 @@ class StatusWriter(ut.TestCase):
         exp_write = [
             *self.init_write_calls,
             call('\r\033[A' + ' ' * 20),
-            call('\r\033[A' + ''),
+            call('\r\033[A' + ' '),
             call('\r' + self.msg_tmp.format(0, 0, 0, 'Starting...') + '\n'),
             call('\r' + self.msg_tmp.format(1, 1, 1, 'Aborting...') + '\n')
         ]
@@ -227,7 +227,7 @@ class StatusWriter(ut.TestCase):
         exp_write = [
             *self.init_write_calls,
             call('\r\033[A' + ' ' * 20),
-            call('\r\033[A' + ''),
+            call('\r\033[A' + ' '),
             call('\r' + self.msg_tmp.format(0, 0, 0, 'Starting...') + '\n'),
             call('\r' + self.msg_tmp.format(1, 1, 1, 'bacon') + '\n')
         ]
