@@ -366,6 +366,13 @@ class TimerTestCase(ut.TestCase):
 
 
 class UpdateStatusTestCase(ut.TestCase):
+    def setUp(self):
+        self.TERMINAL_WIDTH_bkp = sw.TERMINAL_WIDTH
+        sw.TERMINAL_WIDTH = 20
+
+    def tearDown(self):
+        sw.TERMINAL_WIDTH = self.TERMINAL_WIDTH_bkp
+
     @patch('statuswriter.statuswriter.write')
     def test_update(self, mock_write):
         """Given an empty deque of status messages and a new message
@@ -421,7 +428,6 @@ class UpdateStatusTestCase(ut.TestCase):
             'msgs': act_msgs,
             'new_msg': '012345678901234567890123456789',
             'maxlines': 3,
-            'term_width': 20,
         }
 
         # Run test.
@@ -465,7 +471,6 @@ class UpdateStatusTestCase(ut.TestCase):
             'msgs': act_msgs,
             'new_msg': '012345678901234567890123456789',
             'maxlines': 3,
-            'term_width': 20,
             'hang_indent': 4,
         }
 
