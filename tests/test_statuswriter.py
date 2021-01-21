@@ -70,7 +70,7 @@ class StatusWriter(ut.TestCase):
             call(self.progress_frame[0] + '\n'),
             call(self.progress_frame[1] + '\n'),
             call(self.progress_frame[2] + '\n'),
-            call('\n'),
+            call(' \n'),
             call(self.msg_tmp.format(0, 0, 0, 'Starting...') + '\n'),
         ]
         self.init_flush_calls = [
@@ -110,6 +110,71 @@ class StatusWriter(ut.TestCase):
 
     @patch('statuswriter.statuswriter.write')
     @patch('statuswriter.statuswriter.flush')
+    @patch('time.time', return_value=1000)
+    def test_initialize_without_progress(self, _, mock_flush, mock_write):
+        """Given a deque for messages, a title and a maximum number of
+        messages to display, but no progress stages, status_writer
+        should write the initial status display to the terminal without
+        a progress bar.
+        """
+        # Expected value.
+        exp_write = [
+            self.init_write_calls[0],
+            *self.init_write_calls[4:],
+        ]
+        exp_flush = self.init_flush_calls
+
+        # Set up test data and status.
+        cmd_queue = Queue()
+        cmd_queue.put((sw.INIT,))
+        cmd_queue.put((sw.END,))
+        title = self.title
+        maxlines = 2
+
+        # Run test.
+        _ = sw.status_writer(cmd_queue, title, maxlines=maxlines)
+
+        # Extract actual results.
+        act_write = mock_write.mock_calls
+        act_flush = mock_flush.mock_calls
+
+        # Determine if test passed.
+        self.assertListEqual(exp_write, act_write)
+        self.assertListEqual(exp_flush, act_flush)
+
+    @patch('statuswriter.statuswriter.write')
+    @patch('statuswriter.statuswriter.flush')
+    @patch('time.time', return_value=1000)
+    def test_initialize_without_messages(self, _, mock_flush, mock_write):
+        """Given a deque for messages, a title and a number of progres
+        stages, but no progress stages, status_writer should write the
+        initial status display to the terminal without a progress bar.
+        """
+        # Expected value.
+        exp_write = self.init_write_calls[:4]
+        exp_flush = self.init_flush_calls
+
+        # Set up test data and status.
+        cmd_queue = Queue()
+        cmd_queue.put((sw.INIT,))
+        cmd_queue.put((sw.END,))
+        title = self.title
+        stages = 6
+        maxlines = 0
+
+        # Run test.
+        _ = sw.status_writer(cmd_queue, title, stages, maxlines)
+
+        # Extract actual results.
+        act_write = mock_write.mock_calls
+        act_flush = mock_flush.mock_calls
+
+        # Determine if test passed.
+        self.assertListEqual(exp_write, act_write)
+        self.assertListEqual(exp_flush, act_flush)
+
+    @patch('statuswriter.statuswriter.write')
+    @patch('statuswriter.statuswriter.flush')
     @patch('time.time', side_effect=[1000, 1000, 4661, 4661])
     def test_kill(self, _, mock_flush, mock_write):
         """When a message command is sent to the message queue, the
@@ -119,7 +184,7 @@ class StatusWriter(ut.TestCase):
         exp_write = [
             *self.init_write_calls,
             call('\r\033[A' + ' ' * 20),
-            call('\r\033[A' + ''),
+            call('\r\033[A' + ' '),
             call('\r' + self.msg_tmp.format(0, 0, 0, 'Starting...') + '\n'),
             call('\r' + self.msg_tmp.format(1, 1, 1, 'Aborting...') + '\n')
         ]
@@ -162,7 +227,7 @@ class StatusWriter(ut.TestCase):
         exp_write = [
             *self.init_write_calls,
             call('\r\033[A' + ' ' * 20),
-            call('\r\033[A' + ''),
+            call('\r\033[A' + ' '),
             call('\r' + self.msg_tmp.format(0, 0, 0, 'Starting...') + '\n'),
             call('\r' + self.msg_tmp.format(1, 1, 1, 'bacon') + '\n')
         ]
@@ -190,6 +255,31 @@ class StatusWriter(ut.TestCase):
         # Determine if test passed.
         self.assertListEqual(exp_write, act_write)
         self.assertListEqual(exp_flush, act_flush)
+
+    @patch('statuswriter.statuswriter.write')
+    @patch('statuswriter.statuswriter.flush')
+    def test_message_without_messages(self, _, __):
+        """If an MSG command is sent without a message display area
+        being configured, status_writer should raise a ValueError.
+        """
+        # Expected value.
+        exp_exception = ValueError
+        exp_msg = 'Not configured to allow messages.'
+
+        # Set up test data and status.
+        cmd_queue = Queue()
+        cmd_queue.put((sw.INIT,))
+        cmd_queue.put((sw.MSG, 'bacon'))
+        cmd_queue.put((sw.END,))
+        title = self.title
+        stages = 6
+        maxlines = 0
+
+        # Will determine if test passed.
+        with self.assertRaisesRegex(exp_exception, exp_msg):
+
+            # Run test.
+            _ = sw.status_writer(cmd_queue, title, stages, maxlines)
 
     @patch('statuswriter.statuswriter.write')
     @patch('statuswriter.statuswriter.flush')
@@ -230,6 +320,31 @@ class StatusWriter(ut.TestCase):
         self.assertListEqual(exp_write, act_write)
         self.assertListEqual(exp_flush, act_flush)
 
+    @patch('statuswriter.statuswriter.write')
+    @patch('statuswriter.statuswriter.flush')
+    def test_progress_without_bar(self, _, __):
+        """If an PROG command is sent without a progress bar
+        being configured, status_writer should raise a ValueError.
+        """
+        # Expected value.
+        exp_exception = ValueError
+        exp_msg = 'Not configured to show a progress bar.'
+
+        # Set up test data and status.
+        cmd_queue = Queue()
+        cmd_queue.put((sw.INIT,))
+        cmd_queue.put((sw.PROG,))
+        cmd_queue.put((sw.END,))
+        title = self.title
+        stages = 0
+        maxlines = 2
+
+        # Will determine if test passed.
+        with self.assertRaisesRegex(exp_exception, exp_msg):
+
+            # Run test.
+            _ = sw.status_writer(cmd_queue, title, stages, maxlines)
+
 
 class TimerTestCase(ut.TestCase):
     @patch('time.time', side_effect=[1000, 1050])
@@ -251,6 +366,13 @@ class TimerTestCase(ut.TestCase):
 
 
 class UpdateStatusTestCase(ut.TestCase):
+    def setUp(self):
+        self.TERMINAL_WIDTH_bkp = sw.TERMINAL_WIDTH
+        sw.TERMINAL_WIDTH = 20
+
+    def tearDown(self):
+        sw.TERMINAL_WIDTH = self.TERMINAL_WIDTH_bkp
+
     @patch('statuswriter.statuswriter.write')
     def test_update(self, mock_write):
         """Given an empty deque of status messages and a new message
@@ -306,7 +428,6 @@ class UpdateStatusTestCase(ut.TestCase):
             'msgs': act_msgs,
             'new_msg': '012345678901234567890123456789',
             'maxlines': 3,
-            'term_width': 20,
         }
 
         # Run test.
@@ -350,7 +471,6 @@ class UpdateStatusTestCase(ut.TestCase):
             'msgs': act_msgs,
             'new_msg': '012345678901234567890123456789',
             'maxlines': 3,
-            'term_width': 20,
             'hang_indent': 4,
         }
 
